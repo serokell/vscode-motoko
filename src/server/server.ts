@@ -1580,7 +1580,6 @@ documents.onDidChangeContent((event) => {
     if (uri === validatingUri) {
         clearTimeout(validatingTimeout);
     }
-    notify(document);
     validatingUri = uri;
     validatingTimeout = setTimeout(() => {
         notify(document);

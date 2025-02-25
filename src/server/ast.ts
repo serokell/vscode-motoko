@@ -1,4 +1,5 @@
 import { AST } from 'motoko/lib/ast';
+import { ScopeCache } from 'motoko/lib/file';
 import { Context } from './context';
 import { Program, fromAST } from './syntax';
 import { resolveVirtualPath, tryGetFileText } from './utils';
@@ -21,6 +22,8 @@ export const globalASTCache = new Map<string, AstStatus>(); // Share non-typed A
 export default class AstResolver {
     private readonly _cache = globalASTCache;
     private readonly _typedCache = new Map<string, AstStatus>();
+
+    private _scopeCache: ScopeCache;
 
     constructor(private readonly context: Context) {}
 
@@ -61,9 +64,17 @@ export default class AstResolver {
             const virtualPath = resolveVirtualPath(uri);
             let ast: AST;
             try {
-                ast = typed
-                    ? motoko.parseMotokoTyped(virtualPath).ast
-                    : motoko.parseMotoko(text);
+                if (typed) {
+                    console.log('Getting typed AST for URI:', uri);
+                    const [prog, outCache] = motoko.parseMotokoTypedLsp(
+                        virtualPath,
+                        this._scopeCache,
+                    );
+                    this._scopeCache = outCache;
+                    ast = prog.ast;
+                } else {
+                    ast = motoko.parseMotoko(text);
+                }
             } catch (err) {
                 throw new SyntaxError(String(err));
             }
