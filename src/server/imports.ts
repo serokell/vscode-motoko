@@ -1,6 +1,7 @@
 import { pascalCase } from 'change-case';
 import { MultiMap } from 'mnemonist';
 import { AST, Node } from 'motoko/lib/ast';
+import { CompletionItemKind } from 'vscode-languageserver/node';
 import { Context, getContext } from './context';
 import { Import, Program, matchNode } from './syntax';
 import { formatMotoko, getRelativeUri } from './utils';
@@ -8,6 +9,7 @@ import { formatMotoko, getRelativeUri } from './utils';
 interface ResolvedField {
     name: string;
     visibility: string;
+    kind: CompletionItemKind;
     ast: AST;
 }
 
@@ -33,49 +35,60 @@ export default class ImportResolver {
         const [name, importUri] = info;
         this._moduleNameUriMap.set(name, importUri);
         this._fileSystemMap.set(importUri, uri);
-        if (program?.export) {
-            // Resolve field names
-            const { ast } = program.export;
-            const node =
-                matchNode(ast, 'LetD', (_pat: Node, exp: Node) => exp) || // Named
-                matchNode(ast, 'ExpD', (exp: Node) => exp); // Unnamed
-            if (node) {
-                matchNode(
-                    node,
-                    'ObjBlockE',
-                    (_type: string, ...fields: Node[]) => {
-                        this._fieldMap.delete(uri);
-                        fields.forEach((field) => {
-                            if (field.name !== 'DecField') {
-                                console.error(
-                                    'Error: expected `DecField`, received',
-                                    field.name,
-                                );
-                                return;
+        program?.exportFields.forEach(({ exp }) => {
+            matchNode(
+                exp.ast,
+                'ObjBlockE',
+                (_sort: string, _type: string, ...fields: Node[]) => {
+                    this._fieldMap.delete(uri);
+                    fields.forEach((field) => {
+                        if (field.name !== 'DecField') {
+                            console.error(
+                                'Error: expected `DecField`, received',
+                                field.name,
+                            );
+                            return;
+                        }
+                        const [dec, visibility] = field.args!;
+                        if (visibility !== 'Public') {
+                            return;
+                        }
+                        matchNode(dec, 'LetD', (pat: Node, exp: Node) => {
+                            const name = matchNode(
+                                pat,
+                                'VarP',
+                                (field: string) => field,
+                            );
+                            if (name) {
+                                this._fieldMap.set(uri, {
+                                    name,
+                                    visibility,
+                                    kind:
+                                        exp.name === 'FuncE'
+                                            ? CompletionItemKind.Function
+                                            : CompletionItemKind.Variable,
+                                    ast: exp,
+                                });
                             }
-                            const [dec, visibility] = field.args!;
-                            if (visibility !== 'Public') {
-                                return;
-                            }
-                            matchNode(dec, 'LetD', (pat: Node, exp: Node) => {
-                                const name = matchNode(
-                                    pat,
-                                    'VarP',
-                                    (field: string) => field,
-                                );
+                        });
+                        matchNode(
+                            dec,
+                            'ClassD',
+                            (_local: string, name: string) => {
                                 if (name) {
                                     this._fieldMap.set(uri, {
                                         name,
                                         visibility,
-                                        ast: exp,
+                                        kind: CompletionItemKind.Class,
+                                        ast: null,
                                     });
                                 }
-                            });
-                        });
-                    },
-                );
-            }
-        }
+                            },
+                        );
+                    });
+                },
+            );
+        });
         return true;
     }
 

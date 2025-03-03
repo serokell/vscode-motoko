@@ -1000,7 +1000,7 @@ export const addHandlers = (connection: Connection, redirectConsole = true) => {
                 let program: Program | undefined;
                 try {
                     astResolver.notify(uri, content);
-                    // program = astResolver.request(uri)?.program; // TODO: re-enable for field imports
+                    program = astResolver.request(uri)?.program;
                 } catch (err) {
                     console.error(`Error while parsing (${uri}): ${err}`);
                 }
