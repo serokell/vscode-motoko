@@ -35,12 +35,17 @@ export default class ImportResolver {
         const [name, importUri] = info;
         this._moduleNameUriMap.set(name, importUri);
         this._fileSystemMap.set(importUri, uri);
+        this._updateFields(uri, program);
+        return true;
+    }
+
+    _updateFields(uri: string, program: Program | undefined) {
+        this._fieldMap.delete(uri);
         program?.exportFields.forEach(({ exp }) => {
             matchNode(
                 exp.ast,
                 'ObjBlockE',
-                (_sort: string, _type: string, ...fields: Node[]) => {
-                    this._fieldMap.delete(uri);
+                (_s: string, _t: string, ...fields: Node[]) =>
                     fields.forEach((field) => {
                         if (field.name !== 'DecField') {
                             console.error(
@@ -85,11 +90,29 @@ export default class ImportResolver {
                                 }
                             },
                         );
-                    });
-                },
+                        matchNode(dec, 'VarD', (name: string, exp: Node) => {
+                            if (name) {
+                                this._fieldMap.set(uri, {
+                                    name,
+                                    visibility,
+                                    kind: CompletionItemKind.Variable,
+                                    ast: exp,
+                                });
+                            }
+                        });
+                        matchNode(dec, 'TypD', (name: string, exp: Node) => {
+                            if (name) {
+                                this._fieldMap.set(uri, {
+                                    name,
+                                    visibility,
+                                    kind: CompletionItemKind.Interface,
+                                    ast: exp,
+                                });
+                            }
+                        });
+                    }),
             );
         });
-        return true;
     }
 
     delete(uri: string): boolean {
