@@ -5,7 +5,12 @@ import {
     InitializeResult,
 } from 'vscode-languageserver/node';
 import { URI } from 'vscode-uri';
-import { createBenchmark, logInitializationTiming, Setup } from './helpers';
+import {
+    createBenchmark,
+    logInitializationTiming,
+    Setup,
+    Mode,
+} from './helpers';
 import { join } from 'node:path';
 import { clientInitParams } from '../test/mock';
 
@@ -44,13 +49,17 @@ createBenchmark('didChange', async (setup: Setup) => {
             },
         });
 
-        await setup.benchmark<DocumentSymbol>('textDocument/documentSymbol', {
-            textDocument: { uri: document.uri },
-        });
-
-        await setup.sendNotification(
-            'textDocument/didChange',
+        await setup.benchmark<Hover>(
+            'textDocument/hover',
             {
+                textDocument: { uri: document.uri },
+                position: { line: 39, character: 0 }, // NOTE: doesn't matter
+            },
+            10,
+        );
+
+        const changeFile = async () => {
+            await setup.sendNotification('textDocument/didChange', {
                 textDocument: {
                     uri: document.uri,
                     version: 1,
@@ -60,34 +69,18 @@ createBenchmark('didChange', async (setup: Setup) => {
                         text: document.text,
                     },
                 ],
-            },
-            100,
-        );
+            });
+        };
 
-        await setup.benchmark<Hover>('textDocument/hover', {
-            textDocument: { uri: document.uri },
-            position: { line: 39, character: 0 }, // NOTE: doesn't matter
-        });
-
-        await setup.sendNotification(
-            'textDocument/didChange',
+        await setup.benchmark<Hover>(
+            'textDocument/hover',
             {
-                textDocument: {
-                    uri: document.uri,
-                    version: 1,
-                },
-                contentChanges: [
-                    {
-                        text: document.text,
-                    },
-                ],
+                textDocument: { uri: document.uri },
+                position: { line: 39, character: 0 }, // NOTE: doesn't matter
             },
-            100,
+            10,
+            600,
+            /* prepare = */ changeFile,
         );
-
-        await setup.benchmark<Hover>('textDocument/hover', {
-            textDocument: { uri: document.uri },
-            position: { line: 39, character: 0 }, // NOTE: doesn't matter
-        });
     });
 });

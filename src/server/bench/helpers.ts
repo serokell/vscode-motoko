@@ -6,6 +6,10 @@ import { setupClientServer } from '../test/mock';
 const chalk = require('chalk');
 const minimist = require('minimist');
 
+export async function timeout(ms: number) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function measureRequest<T>(
     client: Connection,
     method: string,
@@ -34,10 +38,14 @@ export async function measureMultipleRequestSequential<T>(
     method: string,
     params: object,
     times: number,
+    delayBetweenRerun: number,
+    prepare: () => Promise<void>,
 ): Promise<number[]> {
     assert(times > 1, 'times must be greater than 1');
     const results: number[] = [];
     for (let i = 0; i < times; i++) {
+        await prepare();
+        timeout(delayBetweenRerun);
         const result = await measureRequest<T>(client, method, params);
         results.push(result);
     }
@@ -130,7 +138,9 @@ export class Setup {
         method: string,
         params: object,
         times?: number,
-        mode: Mode = Mode.Concurrent,
+        delayBetweenRerun: number = 600,
+        prepare: () => Promise<void> = async () => {},
+        mode: Mode = Mode.Sequential,
     ): Promise<void> {
         if (times) {
             let timings: number[];
@@ -147,6 +157,8 @@ export class Setup {
                     method,
                     params,
                     times,
+                    delayBetweenRerun,
+                    prepare,
                 );
             }
             const total = timings.reduce((acc, t) => acc + t, 0);
