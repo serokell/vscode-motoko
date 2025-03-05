@@ -45,7 +45,7 @@ export async function measureMultipleRequestSequential<T>(
     const results: number[] = [];
     for (let i = 0; i < times; i++) {
         await prepare();
-        timeout(delayBetweenRerun);
+        await timeout(delayBetweenRerun);
         const result = await measureRequest<T>(client, method, params);
         results.push(result);
     }
