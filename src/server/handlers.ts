@@ -761,6 +761,12 @@ export const addHandlers = (connection: Connection, redirectConsole = true) => {
         });
     }
 
+    // NOTE: Useful for tests and benchmarks
+    let disableChecks = false;
+    connection.onNotification('custom/disableChecks', (_) => {
+        disableChecks = true;
+    });
+
     const checkQueue: string[] = [];
     let checkTimeout: ReturnType<typeof setTimeout>;
     function processQueue() {
@@ -777,8 +783,8 @@ export const addHandlers = (connection: Connection, redirectConsole = true) => {
         }, 0);
     }
     function scheduleCheck(uri: string | TextDocument) {
-        if (loadingPackages) {
-            return;
+        if (disableChecks || loadingPackages) {
+            return false;
         }
         if (checkQueue.length === 0) {
             processQueue();
